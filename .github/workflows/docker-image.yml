@@ -1,0 +1,31 @@
+name: Build and Deploy Application
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Build with Gradle
+        run: ./gradlew build
+
+      - name: Build Docker image
+        run: docker build -t spring-boot-s3-gallery .
+
+      - name: Push Docker image to ECR
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com
+          docker tag spring-boot-s3-gallery:latest <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/spring-boot-s3-gallery:latest
+          docker push <AWS_ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/spring-boot-s3-gallery:latest
