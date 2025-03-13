@@ -21,6 +21,10 @@ Parameters:
   ALBListenerArn:
     Type: String
     Description: ARN of the ALB listener
+  s3BucketName:
+    Type: String
+    Default: image-gallery-mascot-bucket
+    Description: Name of the S3 bucket
 
 Resources:
   # ECS Cluster
@@ -51,9 +55,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - arn:aws:s3:::your-bucket-name
-                  - arn:aws:s3:::your-bucket-name/*
-
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
   # ECS Task Definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -178,8 +181,8 @@ Resources:
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
-      MaxCapacity: 6
-      MinCapacity: 3
+      MaxCapacity: 5
+      MinCapacity: 1
       ResourceId: !Sub "service/${ECSCluster}/${ECSBlueService}"
       RoleARN: !GetAtt AutoScalingRole.Arn
       ScalableDimension: ecs:service:DesiredCount
