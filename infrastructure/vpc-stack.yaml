@@ -2,10 +2,10 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: VPC with Subnets, Routes, Security Groups, and ALB
 
 Parameters:
-  Environment:
+  EnvironmentName:
     Type: String
     Default: dev
-    Description: Environment name (e.g., dev, staging, prod)
+    Description: Environment name (e.g., dev, prod)
 
 Resources:
   # VPC
@@ -17,7 +17,7 @@ Resources:
       EnableDnsHostnames: true
       Tags:
         - Key: Name
-          Value: !Sub "CustomVPC-${Environment}"
+          Value: !Sub "${EnvironmentName}-VPC"
 
   # Public Subnets
   PublicSubnetAZ1:
@@ -25,11 +25,11 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.1.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs '']
+      AvailabilityZone: !Select [0, !GetAZs '']
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "PublicSubnetAZ1-${Environment}"
+          Value: !Sub "${EnvironmentName}-PublicSubnetAZ1"
 
   PublicSubnetAZ2:
     Type: AWS::EC2::Subnet
@@ -40,7 +40,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Sub "PublicSubnetAZ2-${Environment}"
+          Value: !Sub "${EnvironmentName}-PublicSubnetAZ2"
 
   # Private Subnets
   PrivateSubnetAZ1:
@@ -48,20 +48,20 @@ Resources:
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.3.0/24
-      AvailabilityZone: !Select [ 0, !GetAZs '']
+      AvailabilityZone: !Select [0, !GetAZs '']
       Tags:
         - Key: Name
-          Value: !Sub "PrivateSubnetAZ1-${Environment}"
+          Value: !Sub "${EnvironmentName}-PrivateSubnetAZ1"
 
   PrivateSubnetAZ2:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref MyVPC
       CidrBlock: 10.0.4.0/24
-      AvailabilityZone: !Select [ 1, !GetAZs '']
+      AvailabilityZone: !Select [1, !GetAZs '']
       Tags:
         - Key: Name
-          Value: !Sub "PrivateSubnetAZ2-${Environment}"
+          Value: !Sub "${EnvironmentName}-PrivateSubnetAZ2"
 
   # Internet Gateway
   InternetGateway:
@@ -69,28 +69,13 @@ Resources:
     Properties:
       Tags:
         - Key: Name
-          Value: !Sub "IGW-${Environment}"
+          Value: !Sub "${EnvironmentName}-IGW"
 
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref MyVPC
       InternetGatewayId: !Ref InternetGateway
-
-  # NAT Gateway
-  NatGatewayEIP:
-    Type: AWS::EC2::EIP
-    Properties:
-      Domain: vpc
-
-  NatGateway:
-    Type: AWS::EC2::NatGateway
-    Properties:
-      AllocationId: !GetAtt NatGatewayEIP.AllocationId
-      SubnetId: !Ref PublicSubnetAZ1
-      Tags:
-        - Key: Name
-          Value: !Sub "NATGateway-${Environment}"
 
   # Route Tables
   PublicRouteTable:
@@ -99,23 +84,15 @@ Resources:
       VpcId: !Ref MyVPC
       Tags:
         - Key: Name
-          Value: !Sub "PublicRouteTable-${Environment}"
+          Value: !Sub "${EnvironmentName}-PublicRouteTable"
 
-  PrivateRouteTableAZ1:
+  PrivateRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref MyVPC
       Tags:
         - Key: Name
-          Value: !Sub "PrivateRouteTableAZ1-${Environment}"
-
-  PrivateRouteTableAZ2:
-    Type: AWS::EC2::RouteTable
-    Properties:
-      VpcId: !Ref MyVPC
-      Tags:
-        - Key: Name
-          Value: !Sub "PrivateRouteTableAZ2-${Environment}"
+          Value: !Sub "${EnvironmentName}-PrivateRouteTable"
 
   # Routes
   PublicRoute:
@@ -125,50 +102,24 @@ Resources:
       DestinationCidrBlock: 0.0.0.0/0
       GatewayId: !Ref InternetGateway
 
-  PrivateRouteAZ1:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableAZ1
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  PrivateRouteAZ2:
-    Type: AWS::EC2::Route
-    Properties:
-      RouteTableId: !Ref PrivateRouteTableAZ2
-      DestinationCidrBlock: 0.0.0.0/0
-      NatGatewayId: !Ref NatGateway
-
-  # Subnet Route Table Associations
-  PublicSubnetAZ1RouteTableAssociation:
+  # Subnet Associations
+  PublicSubnetAZ1Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnetAZ1
       RouteTableId: !Ref PublicRouteTable
 
-  PublicSubnetAZ2RouteTableAssociation:
+  PublicSubnetAZ2Association:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
       SubnetId: !Ref PublicSubnetAZ2
       RouteTableId: !Ref PublicRouteTable
 
-  PrivateSubnetAZ1RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnetAZ1
-      RouteTableId: !Ref PrivateRouteTableAZ1
-
-  PrivateSubnetAZ2RouteTableAssociation:
-    Type: AWS::EC2::SubnetRouteTableAssociation
-    Properties:
-      SubnetId: !Ref PrivateSubnetAZ2
-      RouteTableId: !Ref PrivateRouteTableAZ2
-
   # Security Groups
   ALBSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub "ALBSecurityGroup-${Environment}"
+      GroupName: !Sub "${EnvironmentName}-ALBSecurityGroup"
       GroupDescription: Security group for ALB
       VpcId: !Ref MyVPC
       SecurityGroupIngress:
@@ -176,15 +127,11 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 443
-          ToPort: 443
-          CidrIp: 0.0.0.0/0
 
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupName: !Sub "ECSSecurityGroup-${Environment}"
+      GroupName: !Sub "${EnvironmentName}-ECSSecurityGroup"
       GroupDescription: Security group for ECS tasks
       VpcId: !Ref MyVPC
       SecurityGroupIngress:
@@ -193,23 +140,38 @@ Resources:
           ToPort: 8080
           SourceSecurityGroupId: !Ref ALBSecurityGroup
 
-Outputs:
-  VpcId:
-    Description: The ID of the VPC
-    Value: !Ref MyVPC
+  # ALB
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${EnvironmentName}-ALB"
+      Subnets:
+        - !Ref PublicSubnetAZ1
+        - !Ref PublicSubnetAZ2
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Scheme: internet-facing
+      Type: application
 
-  PublicSubnets:
-    Description: Public Subnets
-    Value: !Join [",", [!Ref PublicSubnetAZ1, !Ref PublicSubnetAZ2]]
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-TargetGroup"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref MyVPC
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 30
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
 
-  PrivateSubnets:
-    Description: Private Subnets
-    Value: !Join [",", [!Ref PrivateSubnetAZ1, !Ref PrivateSubnetAZ2]]
-
-  ALBSecurityGroupId:
-    Description: Security group ID for ALB
-    Value: !Ref ALBSecurityGroup
-
-  ECSSecurityGroupId:
-    Description: Security group ID for ECS tasks
-    Value: !Ref ECSSecurityGroup
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup

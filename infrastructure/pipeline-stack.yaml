@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CI/CD Pipeline for ECS Deployment
+
+Parameters:
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: GitHub branch name
+  ECRRepositoryURI:
+    Type: String
+    Description: URI of the ECR repository
+  ECSserviceName:
+    Type: String
+    Description: Name of the ECS service
+  ECSclusterName:
+    Type: String
+    Description: Name of the ECS cluster
+
+Resources:
+  # CodePipeline Role
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:*
+                  - ecr:*
+                  - ecs:*
+                Resource: '*'
+
+  # CodePipeline
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !Ref GitHubRepo
+                BranchName: !Ref GitHubBranch
+              OutputArtifacts:
+                - Name: SourceOutput
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: your-build-project
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BuildOutput
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: ECS
+                Version: '1'
+              Configuration:
+                ClusterName: !Ref ECSclusterName
+                ServiceName: !Ref ECSserviceName
+              InputArtifacts:
+                - Name: BuildOutput
