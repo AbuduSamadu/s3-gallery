@@ -1,8 +1,10 @@
-package com.example.s3gallery.controller;
+package com.mascot.springboots3gallery.controller;
 
 
+import com.mascot.springboots3gallery.dto.ImageDto;
+import com.mascot.springboots3gallery.dto.PaginationResponseDto;
+import com.mascot.springboots3gallery.dto.UploadResponseDto;
 import com.mascot.springboots3gallery.service.ImageService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -11,8 +13,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/images")
 public class ImageController {
 
-    @Autowired
-    private ImageService imageService;
+    private final ImageService imageService;
+
+    public ImageController(ImageService imageService) {
+        this.imageService = imageService;
+    }
 
     @PostMapping("/upload")
     public UploadResponseDto uploadImage(@RequestParam("file") MultipartFile file) throws Exception {

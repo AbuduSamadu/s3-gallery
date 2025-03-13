@@ -2,7 +2,6 @@ package com.mascot.springboots3gallery.service;
 
 
 import com.mascot.springboots3gallery.dto.ImageDto;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -16,16 +15,17 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import java.io.File;
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
 
-    @Autowired
-    private S3Client s3Client;
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
 
-    @Autowired
-    private S3Presigner s3Presigner;
+    public S3Service(S3Client s3Client, S3Presigner s3Presigner) {
+        this.s3Client = s3Client;
+        this.s3Presigner = s3Presigner;
+    }
 
     private static final String BUCKET_NAME = "your-bucket-name";
 
@@ -53,24 +53,24 @@ public class S3Service {
     }
 
     // Generate a pre-signed URL for accessing an image
-    public String generatePresignedUrl(String bucketName, String key) {
+    public String generatePresidedUrl(String bucketName, String key) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
                 .key(key)
                 .build();
 
-        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(r -> r
+        PresignedGetObjectRequest resignedRequest = s3Presigner.presignGetObject(r -> r
                 .getObjectRequest(getObjectRequest)
                 .signatureDuration(Duration.ofMinutes(10)));
 
-        return presignedRequest.url().toString();
+        return resignedRequest.url().toString();
     }
 
     // List images from S3 with pagination
     public Page<ImageDto> listImages(Pageable pageable) {
         ListObjectsV2Request request = ListObjectsV2Request.builder()
                 .bucket(BUCKET_NAME)
-                .maxKeys((int) pageable.getPageSize())
+                .maxKeys(pageable.getPageSize())
                 .startAfter(pageable.getPageNumber() > 0 ? String.valueOf(pageable.getPageNumber()) : null)
                 .build();
 
@@ -80,10 +80,10 @@ public class S3Service {
         List<ImageDto> imageDtos = objects.stream()
                 .map(s3Object -> new ImageDto(
                         s3Object.key(),
-                        generatePresignedUrl(BUCKET_NAME, s3Object.key()),
+                        generatePresidedUrl(BUCKET_NAME, s3Object.key()),
                         "image/jpeg", // Replace with actual content type if needed
                         s3Object.size()))
-                .collect(Collectors.toList());
+                .toList();
 
         return new PageImpl<>(imageDtos, pageable, response.keyCount());
     }
