@@ -1,77 +1,32 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: ECS Cluster and Service Configuration with Target Group and ALB
+Description: ECS Cluster with Fargate Tasks and Auto-Scaling
 
 Parameters:
-  VpcId:
-    Type: AWS::EC2::VPC::Id
-    Description: The ID of the VPC created in the VPC stack.
-
-  PublicSubnets:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Public subnets for ALB.
-
-  PrivateSubnets:
-    Type: List<AWS::EC2::Subnet::Id>
-    Description: Private subnets for ECS tasks.
-
-  ALBSecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: Security group ID for ALB.
-
-  ECSSecurityGroupId:
-    Type: AWS::EC2::SecurityGroup::Id
-    Description: Security group ID for ECS tasks.
-
-  ECRRepositoryUri:
+  EnvironmentName:
     Type: String
-    Description: Docker image URI in Amazon ECR.
+    Default: dev
+    Description: Environment name (e.g., dev, prod)
+  ECRRepositoryURI:
+    Type: String
+    Description: URI of the ECR repository
+  TargetGroupArn:
+    Type: String
+    Description: ARN of the ALB target group
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC ID
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: List of private subnet IDs
 
 Resources:
-  # Application Load Balancer (ALB)
-  LoadBalancer:
-    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
-    Properties:
-      Name: !Sub "ALB-${AWS::StackName}"
-      Subnets: !Ref PublicSubnets
-      SecurityGroups:
-        - !Ref ALBSecurityGroupId
-      Scheme: internet-facing
-      Type: application
-      IpAddressType: ipv4
-
-  # Target Group
-  TargetGroup:
-    Type: AWS::ElasticLoadBalancingV2::TargetGroup
-    Properties:
-      Name: !Sub "TG-${AWS::StackName}"
-      Port: 8080
-      Protocol: HTTP
-      VpcId: !Ref VpcId
-      HealthCheckPath: /health
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 5
-      HealthyThresholdCount: 2
-      UnhealthyThresholdCount: 2
-      TargetType: ip
-
-  # Listener
-  Listener:
-    Type: AWS::ElasticLoadBalancingV2::Listener
-    Properties:
-      LoadBalancerArn: !Ref LoadBalancer
-      Port: 80
-      Protocol: HTTP
-      DefaultActions:
-        - Type: forward
-          TargetGroupArn: !Ref TargetGroup
-
   # ECS Cluster
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
-      ClusterName: !Sub "ECSCluster-${AWS::StackName}"
+      ClusterName: !Sub "${EnvironmentName}-ECSCluster"
 
-  # ECS Task Role
+  # ECS Task Role (Access to S3)
   ECSTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -89,31 +44,33 @@ Resources:
             Statement:
               - Effect: Allow
                 Action:
-                  - s3:GetObject
                   - s3:PutObject
+                  - s3:GetObject
                   - s3:ListBucket
-                Resource: "*"
+                Resource:
+                  - arn:aws:s3:::your-bucket-name
+                  - arn:aws:s3:::your-bucket-name/*
 
   # ECS Task Definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
-      Family: !Sub "ECSTask-${AWS::StackName}"
+      Family: !Sub "${EnvironmentName}-Task"
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
-      Cpu: "256"
-      Memory: "512"
-      ExecutionRoleArn: !Ref ECSTaskRole
+      Cpu: "1024"
+      Memory: "2048"
+      ExecutionRoleArn: !GetAtt ECSTaskRole.Arn
       ContainerDefinitions:
-        - Name: spring-boot-app
-          Image: !Ref ECRRepositoryUri
+        - Name: !Sub "${EnvironmentName}-Container"
+          Image: !Ref ECRRepositoryURI
           PortMappings:
             - ContainerPort: 8080
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: /ecs/spring-boot-app
+              awslogs-group: !Sub "/ecs/${EnvironmentName}"
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
@@ -122,31 +79,63 @@ Resources:
     Type: AWS::ECS::Service
     Properties:
       Cluster: !Ref ECSCluster
-      TaskDefinition: !Ref ECSTaskDefinition
-      LaunchType: FARGATE
       DesiredCount: 3
-      DeploymentController:
-        Type: CODE_DEPLOY
+      LaunchType: FARGATE
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
-          Subnets: !Ref PrivateSubnets
+          Subnets: !Ref Subnets
           SecurityGroups:
-            - !Ref ECSSecurityGroupId
+            - !Ref ECSSecurityGroup
+      TaskDefinition: !Ref ECSTaskDefinition
       LoadBalancers:
-        - TargetGroupArn: !Ref TargetGroup
-          ContainerName: spring-boot-app
+        - ContainerName: !Sub "${EnvironmentName}-Container"
           ContainerPort: 8080
+          TargetGroupArn: !Ref TargetGroupArn
 
-Outputs:
-  LoadBalancerDNS:
-    Description: DNS name of the ALB
-    Value: !GetAtt LoadBalancer.DNSName
+  # Scalable Target for ECS Service
+  ECSScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 10
+      MinCapacity: 2
+      ResourceId: !Sub "service/${ECSCluster}/${ECSService}"
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
 
-  ECSClusterName:
-    Description: The name of the ECS cluster
-    Value: !Ref ECSCluster
+  # Scaling Policy (CPU Utilization)
+  ECSScalingPolicy:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-CPUScalingPolicy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ECSScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        TargetValue: 70.0
+        ScaleInCooldown: 60
+        ScaleOutCooldown: 60
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
 
-  ECSServiceName:
-    Description: The name of the ECS service
-    Value: !Ref ECSService
+  # Auto Scaling Role
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: AutoScalingPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: '*'

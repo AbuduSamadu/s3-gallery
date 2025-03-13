@@ -1,0 +1,34 @@
+name: Cleanup Resources
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      # Delete CloudFormation stacks
+      - name: Delete CloudFormation Stacks
+        run: |
+          aws cloudformation delete-stack --stack-name my-vpc-stack
+          aws cloudformation delete-stack --stack-name my-ecs-stack
+          aws cloudformation delete-stack --stack-name my-pipeline-stack
+
+      # Clean up unused ECR images
+      - name: Clean up ECR images
+        run: |
+          aws ecr list-images --repository-name spring-boot-s3-gallery --query 'imageIds[*]' --output json > images.json
+          aws ecr batch-delete-image --repository-name spring-boot-s3-gallery --image-ids file://images.json || true
