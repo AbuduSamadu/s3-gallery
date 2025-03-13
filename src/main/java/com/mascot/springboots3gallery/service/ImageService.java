@@ -32,17 +32,17 @@ public class ImageService {
         }
         File tempFile = convertMultipartFileToFile(file);
         String key = file.getOriginalFilename();
-        s3Service.uploadFile("your-bucket-name", key, tempFile);
-        return s3Service.generatePresidedUrl("your-bucket-name", key);
+        s3Service.uploadFile(key, tempFile);
+        return s3Service.generatePresidedUrl( key);
     }
 
     // Retrieve an image by key
     public String getImage(String key) {
-        if (!s3Service.fileExists("your-bucket-name", key)) {
+        if (!s3Service.fileExists( key)) {
             logger.error("Image not found.");
             throw new ResourceNotFoundException("Image not found.");
         }
-        return s3Service.generatePresidedUrl("your-bucket-name", key);
+        return s3Service.generatePresidedUrl( key);
     }
 
     // List images with pagination

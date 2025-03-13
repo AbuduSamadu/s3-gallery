@@ -21,28 +21,29 @@ public class S3Service {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+    private static final String BUCKET_NAME = "image-gallery-mascot-bucket";
+
 
     public S3Service(S3Client s3Client, S3Presigner s3Presigner) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
     }
 
-    private static final String BUCKET_NAME = "your-bucket-name";
 
     // Upload a file to S3
-    public void uploadFile(String bucketName, String key, File file) {
+    public void uploadFile(String key, File file) {
         PutObjectRequest request = PutObjectRequest.builder()
-                .bucket(bucketName)
+                .bucket(BUCKET_NAME)
                 .key(key)
                 .build();
         s3Client.putObject(request, RequestBody.fromFile(file));
     }
 
     // Check if a file exists in S3
-    public boolean fileExists(String bucketName, String key) {
+    public boolean fileExists( String key) {
         try {
             HeadObjectRequest request = HeadObjectRequest.builder()
-                    .bucket(bucketName)
+                    .bucket(BUCKET_NAME)
                     .key(key)
                     .build();
             s3Client.headObject(request);
@@ -53,9 +54,9 @@ public class S3Service {
     }
 
     // Generate a pre-signed URL for accessing an image
-    public String generatePresidedUrl(String bucketName, String key) {
+    public String generatePresidedUrl( String key) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(bucketName)
+                .bucket(BUCKET_NAME)
                 .key(key)
                 .build();
 
@@ -80,7 +81,7 @@ public class S3Service {
         List<ImageDto> imageDtos = objects.stream()
                 .map(s3Object -> new ImageDto(
                         s3Object.key(),
-                        generatePresidedUrl(BUCKET_NAME, s3Object.key()),
+                        generatePresidedUrl(s3Object.key()),
                         "image/jpeg", // Replace with actual content type if needed
                         s3Object.size()))
                 .toList();
