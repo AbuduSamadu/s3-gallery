@@ -1,13 +1,32 @@
-package com.mascot.springboots3gallery.controller;
+package com.example.s3gallery.controller;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+
+import com.mascot.springboots3gallery.service.ImageService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+@RequestMapping("/api/images")
 public class ImageController {
 
-    @GetMapping("/")
-    public String  getImage() {
-       return "Hello World";
+    @Autowired
+    private ImageService imageService;
+
+    @PostMapping("/upload")
+    public UploadResponseDto uploadImage(@RequestParam("file") MultipartFile file) throws Exception {
+        String imageUrl = imageService.uploadImage(file);
+        return new UploadResponseDto("File uploaded successfully.", imageUrl);
+    }
+
+    @GetMapping("/{key}")
+    public String getImage(@PathVariable String key) {
+        return imageService.getImage(key);
+    }
+
+    @GetMapping
+    public PaginationResponseDto<ImageDto> getImages(Pageable pageable) {
+        return new PaginationResponseDto<>(imageService.listImages(pageable));
     }
 }
