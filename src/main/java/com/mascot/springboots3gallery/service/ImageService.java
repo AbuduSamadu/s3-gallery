@@ -4,6 +4,8 @@ package com.mascot.springboots3gallery.service;
 import com.mascot.springboots3gallery.dto.ImageDto;
 import com.mascot.springboots3gallery.exception.BadRequestException;
 import com.mascot.springboots3gallery.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -14,7 +16,7 @@ import java.io.IOException;
 
 @Service
 public class ImageService {
-
+    Logger logger = LoggerFactory.getLogger(ImageService.class);
     private final S3Service s3Service;
 
     public ImageService(S3Service s3Service) {
@@ -25,6 +27,7 @@ public class ImageService {
     // Upload an image
     public String uploadImage(MultipartFile file) throws IOException {
         if (!file.getContentType().startsWith("image/")) {
+            logger.error("Only image files are allowed.");
             throw new BadRequestException("Only image files are allowed.");
         }
         File tempFile = convertMultipartFileToFile(file);
@@ -36,6 +39,7 @@ public class ImageService {
     // Retrieve an image by key
     public String getImage(String key) {
         if (!s3Service.fileExists("your-bucket-name", key)) {
+            logger.error("Image not found.");
             throw new ResourceNotFoundException("Image not found.");
         }
         return s3Service.generatePresidedUrl("your-bucket-name", key);

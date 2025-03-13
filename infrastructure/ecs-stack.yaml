@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: ECS Cluster with Fargate Tasks and Auto-Scaling
+Description: Optimized ECS Cluster with Fargate Tasks, Auto-Scaling, and Full Blue/Green Deployment
 
 Parameters:
   EnvironmentName:
@@ -9,15 +9,18 @@ Parameters:
   ECRRepositoryURI:
     Type: String
     Description: URI of the ECR repository
-  TargetGroupArn:
-    Type: String
-    Description: ARN of the ALB target group
   VPC:
     Type: AWS::EC2::VPC::Id
     Description: VPC ID
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: List of private subnet IDs
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup::Id
+    Description: Security Group ID
+  ALBListenerArn:
+    Type: String
+    Description: ARN of the ALB listener
 
 Resources:
   # ECS Cluster
@@ -74,8 +77,8 @@ Resources:
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
 
-  # ECS Service
-  ECSService:
+  # ECS Blue Service
+  ECSBlueService:
     Type: AWS::ECS::Service
     Properties:
       Cluster: !Ref ECSCluster
@@ -91,34 +94,112 @@ Resources:
       LoadBalancers:
         - ContainerName: !Sub "${EnvironmentName}-Container"
           ContainerPort: 8080
-          TargetGroupArn: !Ref TargetGroupArn
+          TargetGroupArn: !Ref BlueTargetGroup
 
-  # Scalable Target for ECS Service
-  ECSScalableTarget:
+  # ECS Green Service
+  ECSGreenService:
+    Type: AWS::ECS::Service
+    DependsOn: ECSBlueService
+    Properties:
+      Cluster: !Ref ECSCluster
+      DesiredCount: 0
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref Subnets
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+      TaskDefinition: !Ref ECSTaskDefinition
+      LoadBalancers:
+        - ContainerName: !Sub "${EnvironmentName}-Container"
+          ContainerPort: 8080
+          TargetGroupArn: !Ref GreenTargetGroup
+
+  # Blue Target Group
+  BlueTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-BlueTG"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8080
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      TargetType: ip
+
+  # Green Target Group
+  GreenTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub "${EnvironmentName}-GreenTG"
+      Port: 80
+      Protocol: HTTP
+      VpcId: !Ref VPC
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: 8080
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      TargetType: ip
+
+  # ALB Listener Rule for Blue
+  ALBListenerRuleBlue:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BlueTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /blue/*
+      ListenerArn: !Ref ALBListenerArn
+      Priority: 1
+
+  # ALB Listener Rule for Green
+  ALBListenerRuleGreen:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref GreenTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /green/*
+      ListenerArn: !Ref ALBListenerArn
+      Priority: 2
+
+  # Application Auto Scaling for ECS Service
+  ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
-      MaxCapacity: 10
-      MinCapacity: 2
-      ResourceId: !Sub "service/${ECSCluster}/${ECSService}"
+      MaxCapacity: 6
+      MinCapacity: 3
+      ResourceId: !Sub "service/${ECSCluster}/${ECSBlueService}"
       RoleARN: !GetAtt AutoScalingRole.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
 
-  # Scaling Policy (CPU Utilization)
-  ECSScalingPolicy:
+  # Scaling Policy Based on CPU Utilization
+  ScalingPolicy:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties:
-      PolicyName: !Sub "${EnvironmentName}-CPUScalingPolicy"
+      PolicyName: CPUScalingPolicy
       PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ECSScalableTarget
+      ScalingTargetId: !Ref ScalableTarget
       TargetTrackingScalingPolicyConfiguration:
-        TargetValue: 70.0
-        ScaleInCooldown: 60
-        ScaleOutCooldown: 60
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 300
 
-  # Auto Scaling Role
+  # IAM Role for Application Auto Scaling
   AutoScalingRole:
     Type: AWS::IAM::Role
     Properties:
@@ -130,7 +211,7 @@ Resources:
               Service: application-autoscaling.amazonaws.com
             Action: sts:AssumeRole
       Policies:
-        - PolicyName: AutoScalingPolicy
+        - PolicyName: ECSScalingPolicy
           PolicyDocument:
             Version: '2012-10-17'
             Statement:
@@ -138,4 +219,15 @@ Resources:
                 Action:
                   - ecs:DescribeServices
                   - ecs:UpdateService
-                Resource: '*'
+                Resource: "*"
+
+Outputs:
+  ECSClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref ECSCluster
+  ECSBlueServiceName:
+    Description: The name of the ECS Blue service
+    Value: !Ref ECSBlueService
+  ECSGreenServiceName:
+    Description: The name of the ECS Green service
+    Value: !Ref ECSGreenService
