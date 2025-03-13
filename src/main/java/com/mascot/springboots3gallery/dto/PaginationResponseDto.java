@@ -3,6 +3,7 @@ package com.mascot.springboots3gallery.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 
@@ -11,10 +12,19 @@ import java.util.List;
 @NoArgsConstructor
 public class PaginationResponseDto<T> {
 
-    private List<T> content;     // List of items (e.g., images)
-    private int pageNumber;      // Current page number
-    private int pageSize;        // Number of items per page
-    private long totalElements;  // Total number of items
-    private int totalPages;      // Total number of pages
-    private boolean last;        // Indicates if this is the last page
+    private List<T> content;
+    private int pageNumber;
+    private int pageSize;
+    private long totalElements;
+    private int totalPages;
+    private boolean last;
+
+
+    public PaginationResponseDto(Page<ImageDto> imageDtos) {
+        this.pageNumber = imageDtos.getNumber();
+        this.pageSize = imageDtos.getSize();
+        this.totalElements = imageDtos.getTotalElements();
+        this.totalPages = imageDtos.getTotalPages();
+        this.last = imageDtos.isLast();
+    }
 }

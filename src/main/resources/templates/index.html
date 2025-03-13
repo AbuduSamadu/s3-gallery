@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery</title>
+    <!-- Link to external CSS -->
+    <link rel="stylesheet" th:href="@{/css/styles.css}">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+<!-- Navbar -->
+<header class="navbar">
+    <div class="logo">
+        <img th:src="@{/images/logo.png}" alt="Logo">
+        <h1>Image Gallery</h1>
+    </div>
+    <div class="upload-button">
+        <label for="image-upload" class="button">
+            <i class="fa-solid fa-upload"></i> Upload
+        </label>
+        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+    </div>
+</header>
+
+<!-- Image Gallery -->
+<main>
+    <section class="gallery">
+        <!-- Dynamic cards from backend -->
+        <div class="card" th:each="image : ${content}">
+            <img th:src="${image.url}" alt="Image" class="card-image">
+            <div class="card-info">
+                <p class="date-time" th:text="${#temporals.format(image.uploadedAt, 'yyyy-MM-dd HH:mm')}"></p>
+                <div class="actions">
+                    <button class="edit-button">
+                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                    </button>
+                    <button class="delete-button">
+                        <i class="fa-solid fa-trash"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pagination Controls -->
+    <footer class="pagination">
+        <button id="prev-page" disabled th:if="${pageNumber == 0}">
+            <i class="fa-solid fa-chevron-left"></i> Previous
+        </button>
+        <button id="next-page" th:unless="${last}">
+            Next <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    </footer>
+</main>
+
+<!-- Link to external JavaScript -->
+<script th:src="@{/js/main.js}"></script>
+</body>
+</html>
