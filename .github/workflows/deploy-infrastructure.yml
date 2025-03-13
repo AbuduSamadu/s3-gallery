@@ -1,31 +1,61 @@
 name: Deploy Infrastructure
+
 on:
   push:
     branches:
       - main
     paths:
       - 'infrastructure/**'
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
+      # Checkout the code
       - name: Checkout code
         uses: actions/checkout@v3
+
+      # Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-east-1
+
+      # Deploy VPC stack
       - name: Deploy VPC Stack
         run: |
           aws cloudformation deploy \
             --template-file infrastructure/vpc-stack.yaml \
             --stack-name my-vpc-stack \
             --capabilities CAPABILITY_NAMED_IAM
+
+      # Deploy ECS stack
       - name: Deploy ECS Stack
         run: |
           aws cloudformation deploy \
             --template-file infrastructure/ecs-stack.yaml \
             --stack-name my-ecs-stack \
-            --capabilities CAPABILITY_NAMED_IAM
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              EnvironmentName=dev \
+              ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
+              TargetGroupArn=${{ secrets.TARGET_GROUP_ARN }} \
+              VPC=${{ secrets.VPC_ID }} \
+              Subnets=${{ secrets.SUBNET_IDS }}
+
+      # Deploy Pipeline stack
+      - name: Deploy Pipeline Stack
+        run: |
+          aws cloudformation deploy \
+            --template-file infrastructure/pipeline-stack.yaml \
+            --stack-name my-pipeline-stack \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --parameter-overrides \
+              GitHubRepo=${{ github.repository }} \
+              GitHubBranch=main \
+              ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
+              ECSserviceName=my-ecs-service \
+              ECSclusterName=my-ecs-cluster
