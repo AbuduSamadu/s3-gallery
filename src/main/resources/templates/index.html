@@ -29,7 +29,7 @@
     <section class="gallery">
         <!-- Dynamic cards from backend -->
         <div class="card" th:each="image : ${content}">
-            <img th:src="${image.url}" alt="Image" class="card-image">
+            <img th:src="@{/images/logo.png}" alt="Image" class="card-image">
             <div class="card-info">
                 <p class="date-time" th:text="${#temporals.format(image.uploadedAt, 'yyyy-MM-dd HH:mm')}"></p>
                 <div class="actions">
