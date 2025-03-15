@@ -25,7 +25,7 @@ Parameters:
     Description: ARN of the ALB listener
   s3BucketName:
     Type: String
-    Default: image-gallery-mascot-bucket
+    Default: image-gallery-mascot
     Description: Name of the S3 bucket
 
 Resources:
