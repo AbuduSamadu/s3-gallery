@@ -18,7 +18,6 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import java.io.File;
 import java.time.Duration;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
@@ -28,15 +27,13 @@ public class S3Service {
     private final ContentTypeUtil contentTypeUtil;
     private static final String BUCKET_NAME = "image-gallery-mascot";
 
-    private static final Logger logger = LoggerFactory.getLogger(ImageService.class);
+    private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
 
     public S3Service(S3Client s3Client, S3Presigner s3Presigner, ContentTypeUtil contentTypeUtil) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
         this.contentTypeUtil = contentTypeUtil;
     }
-
-
     // Upload a file to S3
     public void uploadFile(String key, File file) {
         PutObjectRequest request = PutObjectRequest.builder()
@@ -78,7 +75,7 @@ public class S3Service {
     public Page<ImageDto> listImages(Pageable pageable) {
         ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                 .bucket(BUCKET_NAME)
-                .maxKeys((int) pageable.getPageSize())
+                .maxKeys(pageable.getPageSize())
                 .startAfter(pageable.getPageNumber() > 0 ? String.valueOf(pageable.getPageNumber()) : null)
                 .build());
 
@@ -116,7 +113,7 @@ public class S3Service {
                             contentType,
                             s3Object.size());
                 })
-                .collect(Collectors.toList());
+                .toList();
 
         logger.info("Returning {} images for page {} with size {}", imageDtos.size(), pageable.getPageNumber(), pageable.getPageSize());
         return new PageImpl<>(imageDtos, pageable, response.keyCount());
