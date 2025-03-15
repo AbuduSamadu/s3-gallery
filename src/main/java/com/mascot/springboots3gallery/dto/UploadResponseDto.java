@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class UploadResponseDto {
 
-    private String message;      // Success message
-    private String imageUrl;     // Pre-signed URL for accessing the uploaded image
+    private String message;
+    private String imageUrl;
 }
