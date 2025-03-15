@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ErrorResponseDto {
 
-    private int status;          // HTTP status code
-    private String message;      // Error message
+    private int status;
+    private String message;
 }
