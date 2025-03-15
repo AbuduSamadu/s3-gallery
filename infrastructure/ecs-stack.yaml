@@ -234,3 +234,4 @@ Outputs:
   ECSGreenServiceName:
     Description: The name of the ECS Green service
     Value: !Ref ECSGreenService
+
