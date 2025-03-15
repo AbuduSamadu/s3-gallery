@@ -2,6 +2,9 @@ package com.mascot.springboots3gallery.service;
 
 
 import com.mascot.springboots3gallery.dto.ImageDto;
+import com.mascot.springboots3gallery.utility.ContentTypeUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
@@ -15,18 +18,22 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequ
 import java.io.File;
 import java.time.Duration;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
-    private static final String BUCKET_NAME = "image-gallery-mascot-bucket";
+    private final ContentTypeUtil contentTypeUtil;
+    private static final String BUCKET_NAME = "image-gallery-mascot";
 
+    private static final Logger logger = LoggerFactory.getLogger(ImageService.class);
 
-    public S3Service(S3Client s3Client, S3Presigner s3Presigner) {
+    public S3Service(S3Client s3Client, S3Presigner s3Presigner, ContentTypeUtil contentTypeUtil) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
+        this.contentTypeUtil = contentTypeUtil;
     }
 
 
@@ -62,30 +69,56 @@ public class S3Service {
 
         PresignedGetObjectRequest resignedRequest = s3Presigner.presignGetObject(r -> r
                 .getObjectRequest(getObjectRequest)
-                .signatureDuration(Duration.ofMinutes(10)));
+                .signatureDuration(Duration.ofMinutes(120)));
 
         return resignedRequest.url().toString();
     }
 
     // List images from S3 with pagination
     public Page<ImageDto> listImages(Pageable pageable) {
-        ListObjectsV2Request request = ListObjectsV2Request.builder()
+        ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
                 .bucket(BUCKET_NAME)
-                .maxKeys(pageable.getPageSize())
+                .maxKeys((int) pageable.getPageSize())
                 .startAfter(pageable.getPageNumber() > 0 ? String.valueOf(pageable.getPageNumber()) : null)
-                .build();
+                .build());
 
-        ListObjectsV2Response response = s3Client.listObjectsV2(request);
         List<S3Object> objects = response.contents();
-
         List<ImageDto> imageDtos = objects.stream()
-                .map(s3Object -> new ImageDto(
-                        s3Object.key(),
-                        generatePresidedUrl(s3Object.key()),
-                        "image/jpeg", // Replace with actual content type if needed
-                        s3Object.size()))
-                .toList();
+                .map(s3Object -> {
+                    String key = s3Object.key();
+                    logger.info("Processing object with key: {}", key);
 
+                    // Generate pre-signed URL
+                    String presignedUrl = generatePresidedUrl(key);
+                    logger.info("Generated pre-signed URL for {}: {}", key, presignedUrl);
+
+                    // Retrieve metadata (content type)
+                    String contentType = null;
+                    try {
+                        HeadObjectResponse metadata = s3Client.headObject(HeadObjectRequest.builder()
+                                .bucket(BUCKET_NAME)
+                                .key(key)
+                                .build());
+                        contentType = metadata.contentType();
+                    } catch (Exception e) {
+                        logger.warn("Failed to retrieve metadata for {}: {}", key, e.getMessage());
+                    }
+
+                    // Fallback to inferring content type from key
+                    if (contentType == null || contentType.equals("application/octet-stream")) {
+                        contentType = contentTypeUtil.getContentTypeFromKey(key);
+                        logger.info("Inferred content type for {}: {}", key, contentType);
+                    }
+
+                    return new ImageDto(
+                            key,
+                            presignedUrl,
+                            contentType,
+                            s3Object.size());
+                })
+                .collect(Collectors.toList());
+
+        logger.info("Returning {} images for page {} with size {}", imageDtos.size(), pageable.getPageNumber(), pageable.getPageSize());
         return new PageImpl<>(imageDtos, pageable, response.keyCount());
     }
 }

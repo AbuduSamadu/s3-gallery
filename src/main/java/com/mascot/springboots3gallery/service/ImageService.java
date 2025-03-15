@@ -42,11 +42,13 @@ public class ImageService {
             logger.error("Image not found.");
             throw new ResourceNotFoundException("Image not found.");
         }
+        logger.info("Retrieving image with key: {}", key);
         return s3Service.generatePresidedUrl( key);
     }
 
     // List images with pagination
     public Page<ImageDto> listImages(Pageable pageable) {
+        logger.info("Listing images with page {} and size {}", pageable.getPageNumber(), pageable.getPageSize());
         return s3Service.listImages(pageable);
     }
 
