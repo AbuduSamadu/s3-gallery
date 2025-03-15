@@ -159,3 +159,8 @@ body {
     background-color: #ccc;
     cursor: not-allowed;
 }
+
+#image-preview{
+    max-height: 200px;
+    object-fit: cover;
+}
