@@ -17,9 +17,11 @@ Parameters:
     Description: List of private subnet IDs
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup::Id
+    Default: sg-05b963638146801a5
     Description: Security Group ID
   ALBListenerArn:
     Type: String
+    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:loadbalancer/app/dev-ALB/cf5314d6db52f920
     Description: ARN of the ALB listener
   s3BucketName:
     Type: String
