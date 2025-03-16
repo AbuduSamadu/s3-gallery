@@ -21,7 +21,7 @@ Parameters:
     Description: Security Group ID
   ALBListenerArn:
     Type: String
-    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:loadbalancer/app/dev-ALB/cf5314d6db52f920
+    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:listener/app/dev-ALB/cf5314d6db52f920/5afc0c3c984f5641
     Description: ARN of the ALB listener
   s3BucketName:
     Type: String
@@ -57,8 +57,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - !Sub 'arn:aws:s3:::${S3BucketName}'
-                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+                  - !Sub 'arn:aws:s3:::${s3BucketName}'
+                  - !Sub 'arn:aws:s3:::${s3BucketName}/*'
   # ECS Task Definition
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
@@ -183,7 +183,7 @@ Resources:
   ScalableTarget:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
-      MaxCapacity: 5
+      MaxCapacity: 3
       MinCapacity: 1
       ResourceId: !Sub "service/${ECSCluster}/${ECSBlueService}"
       RoleARN: !GetAtt AutoScalingRole.Arn
@@ -236,4 +236,3 @@ Outputs:
   ECSGreenServiceName:
     Description: The name of the ECS Green service
     Value: !Ref ECSGreenService
-
