@@ -3,15 +3,23 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "src**"
-      - "Dockerfile"
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Build Java App
+        run: mvn clean package
+
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
