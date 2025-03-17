@@ -21,7 +21,7 @@ Parameters:
     Description: Security Group ID
   ALBListenerArn:
     Type: String
-    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:listener/app/dev-ALB/cf5314d6db52f920/5afc0c3c984f5641
+    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:listener/app/dev-ALB/43bd048fa07719a1/1196879dfe761442
     Description: ARN of the ALB listener
   s3BucketName:
     Type: String
@@ -200,7 +200,7 @@ Resources:
       TargetTrackingScalingPolicyConfiguration:
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
-        TargetValue: 70.0
+        TargetValue: 50.0
         ScaleInCooldown: 300
         ScaleOutCooldown: 300
 

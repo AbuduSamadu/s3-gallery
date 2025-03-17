@@ -38,8 +38,8 @@ jobs:
       - name: Build, tag and push image to Amazon ECR
         env:
           ECR_REGISTRY: public.ecr.aws/g4y8k5p1
-          ECR_REPOSITORY: abudusamadu
-          IMAGE_TAG: abudusamadu_taskmanager
+          ECR_REPOSITORY: s3-gallery
+          IMAGE_TAG: latest
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
