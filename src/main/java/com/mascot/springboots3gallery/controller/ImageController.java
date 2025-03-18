@@ -2,13 +2,12 @@ package com.mascot.springboots3gallery.controller;
 
 
 import com.mascot.springboots3gallery.dto.UploadResponseDto;
-import com.mascot.springboots3gallery.exception.BadRequestException;
+import com.mascot.springboots3gallery.service.ImageService;
 import com.mascot.springboots3gallery.service.S3Service;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 
@@ -17,30 +16,19 @@ import java.util.Map;
 public class ImageController {
 
     private final S3Service s3Service;
+    private final ImageService imageService;
 
-    public ImageController( S3Service s3Service) {
-
+    public ImageController(S3Service s3Service, ImageService imageService) {
         this.s3Service = s3Service;
+        this.imageService = imageService;
     }
 
 
     @PostMapping("/upload")
-    public ResponseEntity<UploadResponseDto> uploadImage(
-            @RequestParam("file") MultipartFile file,
-            @RequestParam("imageName") String imageName) throws IOException {
-
-        if (!file.getContentType().startsWith("image/")) {
-            throw new BadRequestException("Only image files are allowed.");
-        }
-
-        File tempFile = File.createTempFile("temp", null);
-        file.transferTo(tempFile);
-
-        String key = imageName + "-" + file.getOriginalFilename();
-        s3Service.uploadFile(key, tempFile);
-
-        String presignedUrl = s3Service.generatePresidedUrl(key);
-        return ResponseEntity.ok(new UploadResponseDto("File uploaded successfully.", presignedUrl));
+    public ResponseEntity<UploadResponseDto> uploadImage(@RequestParam("file") MultipartFile file, @RequestParam("imageName") String imageName) throws IOException {
+        imageService.uploadImage(file, imageName);
+        String imageUrl = s3Service.generatePresidedUrl(file.getOriginalFilename());
+        return ResponseEntity.ok(new UploadResponseDto("File uploaded successfully.", imageUrl));
     }
 
     @DeleteMapping("/{key}")

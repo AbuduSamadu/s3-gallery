@@ -338,10 +338,6 @@ Resources:
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 50
-        # Enable circuit breaker with rollback for more stability
-        DeploymentCircuitBreaker:
-          Enable: false
-          Rollback: false
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
