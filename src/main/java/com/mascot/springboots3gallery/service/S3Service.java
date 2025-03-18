@@ -23,25 +23,23 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class S3Service {
 
+    private static final String BUCKET_NAME = "image-gallery-mascot";
+    private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final ContentTypeUtil contentTypeUtil;
-    private static final String BUCKET_NAME = "image-gallery-mascot";
-
     private final Map<String, String> imageNameMap = new HashMap<>();
-
-    private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
 
     public S3Service(S3Client s3Client, S3Presigner s3Presigner, ContentTypeUtil contentTypeUtil) {
         this.s3Client = s3Client;
         this.s3Presigner = s3Presigner;
         this.contentTypeUtil = contentTypeUtil;
     }
+
     // Upload a file to S3
     public void uploadFile(String key, File file) {
         PutObjectRequest request = PutObjectRequest.builder()
@@ -52,7 +50,7 @@ public class S3Service {
     }
 
     // Check if a file exists in S3
-    public boolean fileExists( String key) {
+    public boolean fileExists(String key) {
         try {
             HeadObjectRequest request = HeadObjectRequest.builder()
                     .bucket(BUCKET_NAME)
@@ -70,7 +68,7 @@ public class S3Service {
             throw new ResourceNotFoundException("Image with key " + key + " not found.");
         }
         imageNameMap.put(key, newName);
-       logger.info("Updated image name for key {}: {}", key, newName);
+        logger.info("Updated image name for key {}: {}", key, newName);
     }
 
     public String getImageName(String key) {
@@ -79,7 +77,7 @@ public class S3Service {
 
 
     // Generate a pre-signed URL for accessing an image
-    public String generatePresidedUrl( String key) {
+    public String generatePresidedUrl(String key) {
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(BUCKET_NAME)
                 .key(key)
