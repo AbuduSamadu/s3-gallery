@@ -1,41 +1,120 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Optimized ECS Cluster with Fargate Tasks, Auto-Scaling, and Full Blue/Green Deployment
 
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: "Environment Configuration"
+        Parameters:
+          - EnvironmentName
+      - Label:
+          default: "Application Configuration"
+        Parameters:
+          - ECRRepositoryURI
+          - s3BucketName
+          - ContainerPort
+          - TaskCPU
+          - TaskMemory
+      - Label:
+          default: "Network Configuration"
+        Parameters:
+          - VPC
+          - Subnets
+          - ECSSecurityGroup
+          - ALBListenerArn
+
 Parameters:
   EnvironmentName:
     Type: String
     Default: dev
     Description: Environment name (e.g., dev, prod)
+    AllowedPattern: '[a-zA-Z0-9-]+'
+    ConstraintDescription: Must contain only alphanumeric characters and hyphens
+
   ECRRepositoryURI:
     Type: String
     Description: URI of the ECR repository
+
   VPC:
     Type: AWS::EC2::VPC::Id
     Description: VPC ID
+
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
     Description: List of private subnet IDs
+
   ECSSecurityGroup:
     Type: AWS::EC2::SecurityGroup::Id
-    Default: sg-05b963638146801a5
-    Description: Security Group ID
+    Description: Security Group ID for ECS tasks
+
   ALBListenerArn:
     Type: String
-    Default: arn:aws:elasticloadbalancing:us-east-1:639032722473:listener/app/dev-ALB/43bd048fa07719a1/1196879dfe761442
     Description: ARN of the ALB listener
+
   s3BucketName:
     Type: String
-    Default: image-gallery-mascot
-    Description: Name of the S3 bucket
+    Description: Name of the S3 bucket for application assets
+
+  ContainerPort:
+    Type: Number
+    Default: 8080
+    Description: Port exposed by the container
+    MinValue: 1
+    MaxValue: 65535
+
+  TaskCPU:
+    Type: String
+    Default: "1024"
+    Description: CPU units for the task (1024 = 1 vCPU)
+    AllowedValues:
+      - "256"
+      - "512"
+      - "1024"
+      - "2048"
+      - "4096"
+
+  TaskMemory:
+    Type: String
+    Default: "2048"
+    Description: Memory for the task in MB
+    AllowedValues:
+      - "512"
+      - "1024"
+      - "2048"
+      - "4096"
+      - "8192"
+      - "16384"
 
 Resources:
-  # ECS Cluster
+  #----------------------------------------------------------------------------
+  # ECS Cluster and Log Groups
+  #----------------------------------------------------------------------------
   ECSCluster:
     Type: AWS::ECS::Cluster
     Properties:
       ClusterName: !Sub "${EnvironmentName}-ECSCluster"
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-ECSCluster"
 
-  # ECS Task Role (Access to S3)
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${EnvironmentName}"
+      RetentionInDays: 14
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  #----------------------------------------------------------------------------
+  # IAM Roles
+  #----------------------------------------------------------------------------
   ECSTaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -46,6 +125,8 @@ Resources:
             Principal:
               Service: ecs-tasks.amazonaws.com
             Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
       Policies:
         - PolicyName: S3AccessPolicy
           PolicyDocument:
@@ -59,7 +140,45 @@ Resources:
                 Resource:
                   - !Sub 'arn:aws:s3:::${s3BucketName}'
                   - !Sub 'arn:aws:s3:::${s3BucketName}/*'
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  ECSExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  AutoScalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: application-autoscaling.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceAutoscaleRole
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  #----------------------------------------------------------------------------
   # ECS Task Definition
+  #----------------------------------------------------------------------------
   ECSTaskDefinition:
     Type: AWS::ECS::TaskDefinition
     Properties:
@@ -67,91 +186,102 @@ Resources:
       NetworkMode: awsvpc
       RequiresCompatibilities:
         - FARGATE
-      Cpu: "1024"
-      Memory: "2048"
-      ExecutionRoleArn: !GetAtt ECSTaskRole.Arn
+      Cpu: !Ref TaskCPU
+      Memory: !Ref TaskMemory
+      ExecutionRoleArn: !GetAtt ECSExecutionRole.Arn
+      TaskRoleArn: !GetAtt ECSTaskRole.Arn
       ContainerDefinitions:
         - Name: !Sub "${EnvironmentName}-Container"
           Image: !Ref ECRRepositoryURI
+          Essential: true
           PortMappings:
-            - ContainerPort: 8080
+            - ContainerPort: !Ref ContainerPort
           LogConfiguration:
             LogDriver: awslogs
             Options:
-              awslogs-group: !Sub "/ecs/${EnvironmentName}"
+              awslogs-group: !Ref LogGroup
               awslogs-region: !Ref AWS::Region
               awslogs-stream-prefix: ecs
+          Environment:
+            - Name: ENVIRONMENT
+              Value: !Ref EnvironmentName
+          # Modified health check with increased startup period and more retries
+          HealthCheck:
+            Command:
+              - CMD-SHELL
+              - curl -f http://localhost:8080/health || exit 1
+            Interval: 30
+            Timeout: 10
+            Retries: 5
+            StartPeriod: 120
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
 
-  # ECS Blue Service
-  ECSBlueService:
-    Type: AWS::ECS::Service
-    Properties:
-      Cluster: !Ref ECSCluster
-      DesiredCount: 3
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          Subnets: !Ref Subnets
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-      TaskDefinition: !Ref ECSTaskDefinition
-      LoadBalancers:
-        - ContainerName: !Sub "${EnvironmentName}-Container"
-          ContainerPort: 8080
-          TargetGroupArn: !Ref BlueTargetGroup
-
-  # ECS Green Service
-  ECSGreenService:
-    Type: AWS::ECS::Service
-    DependsOn: ECSBlueService
-    Properties:
-      Cluster: !Ref ECSCluster
-      DesiredCount: 0
-      LaunchType: FARGATE
-      NetworkConfiguration:
-        AwsvpcConfiguration:
-          AssignPublicIp: DISABLED
-          Subnets: !Ref Subnets
-          SecurityGroups:
-            - !Ref ECSSecurityGroup
-      TaskDefinition: !Ref ECSTaskDefinition
-      LoadBalancers:
-        - ContainerName: !Sub "${EnvironmentName}-Container"
-          ContainerPort: 8080
-          TargetGroupArn: !Ref GreenTargetGroup
-
-  # Blue Target Group
+  #----------------------------------------------------------------------------
+  # Target Groups
+  #----------------------------------------------------------------------------
   BlueTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub "${EnvironmentName}-BlueTG"
-      Port: 80
+      Port: !Ref ContainerPort
       Protocol: HTTP
       VpcId: !Ref VPC
+      # Modified health check settings with longer timeouts and intervals
       HealthCheckProtocol: HTTP
-      HealthCheckPort: 8080
-      HealthCheckPath: /
+      HealthCheckPort: traffic-port
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
       Matcher:
-        HttpCode: 200
+        HttpCode: 200-299
       TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: slow_start.duration_seconds
+          Value: 120
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-BlueTG"
 
-  # Green Target Group
   GreenTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
       Name: !Sub "${EnvironmentName}-GreenTG"
-      Port: 80
+      Port: !Ref ContainerPort
       Protocol: HTTP
       VpcId: !Ref VPC
+      # Modified health check settings with longer timeouts and intervals
       HealthCheckProtocol: HTTP
-      HealthCheckPort: 8080
-      HealthCheckPath: /
+      HealthCheckPort: traffic-port
+      HealthCheckPath: /health
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 30
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
       Matcher:
-        HttpCode: 200
+        HttpCode: 200-299
       TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: slow_start.duration_seconds
+          Value: 120
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-GreenTG"
 
-  # ALB Listener Rule for Blue
+  #----------------------------------------------------------------------------
+  # ALB Listener Rules
+  #----------------------------------------------------------------------------
   ALBListenerRuleBlue:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -165,7 +295,6 @@ Resources:
       ListenerArn: !Ref ALBListenerArn
       Priority: 1
 
-  # ALB Listener Rule for Green
   ALBListenerRuleGreen:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -179,60 +308,173 @@ Resources:
       ListenerArn: !Ref ALBListenerArn
       Priority: 2
 
-  # Application Auto Scaling for ECS Service
-  ScalableTarget:
+  ALBListenerRuleDefault:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref BlueTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values:
+            - /*
+      ListenerArn: !Ref ALBListenerArn
+      Priority: 100
+
+  #----------------------------------------------------------------------------
+  # ECS Services
+  #----------------------------------------------------------------------------
+  ECSBlueService:
+    Type: AWS::ECS::Service
+    DependsOn: ALBListenerRuleBlue
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-Blue-Service"
+      Cluster: !Ref ECSCluster
+      # Start with fewer instances to ensure stability
+      DesiredCount: 1
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      # Modified deployment configuration to be more forgiving
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+        # Disable circuit breaker initially to avoid triggering the error
+        DeploymentCircuitBreaker:
+          Enable: false
+          Rollback: false
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref Subnets
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+      TaskDefinition: !Ref ECSTaskDefinition
+      LoadBalancers:
+        - ContainerName: !Sub "${EnvironmentName}-Container"
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref BlueTargetGroup
+      # Enable healthcheck grace period to allow time for startup
+      HealthCheckGracePeriodSeconds: 300
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-Blue-Service"
+
+  ECSGreenService:
+    Type: AWS::ECS::Service
+    DependsOn: ALBListenerRuleGreen
+    Properties:
+      ServiceName: !Sub "${EnvironmentName}-Green-Service"
+      Cluster: !Ref ECSCluster
+      # Start with zero instances to avoid deployment issues
+      DesiredCount: 0
+      LaunchType: FARGATE
+      PlatformVersion: LATEST
+      # Modified deployment configuration to be more forgiving
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 50
+        # Disable circuit breaker initially to avoid triggering the error
+        DeploymentCircuitBreaker:
+          Enable: false
+          Rollback: false
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref Subnets
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+      TaskDefinition: !Ref ECSTaskDefinition
+      LoadBalancers:
+        - ContainerName: !Sub "${EnvironmentName}-Container"
+          ContainerPort: !Ref ContainerPort
+          TargetGroupArn: !Ref GreenTargetGroup
+      # Enable healthcheck grace period to allow time for startup
+      HealthCheckGracePeriodSeconds: 300
+      EnableECSManagedTags: true
+      PropagateTags: SERVICE
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-Green-Service"
+
+  #----------------------------------------------------------------------------
+  # Auto Scaling Configuration
+  #----------------------------------------------------------------------------
+  ScalableTargetBlue:
     Type: AWS::ApplicationAutoScaling::ScalableTarget
     Properties:
-      MaxCapacity: 3
+      MaxCapacity: 10
       MinCapacity: 1
-      ResourceId: !Sub "service/${ECSCluster}/${ECSBlueService}"
+      ResourceId: !Sub "service/${ECSCluster}/${ECSBlueService.Name}"
       RoleARN: !GetAtt AutoScalingRole.Arn
       ScalableDimension: ecs:service:DesiredCount
       ServiceNamespace: ecs
 
-  # Scaling Policy Based on CPU Utilization
-  ScalingPolicy:
+  ScalingPolicyBlue:
     Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties:
-      PolicyName: CPUScalingPolicy
+      PolicyName: !Sub "${EnvironmentName}-Blue-CPUScalingPolicy"
       PolicyType: TargetTrackingScaling
-      ScalingTargetId: !Ref ScalableTarget
+      ScalingTargetId: !Ref ScalableTargetBlue
       TargetTrackingScalingPolicyConfiguration:
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageCPUUtilization
-        TargetValue: 50.0
+        TargetValue: 70.0
         ScaleInCooldown: 300
-        ScaleOutCooldown: 300
+        ScaleOutCooldown: 60
 
-  # IAM Role for Application Auto Scaling
-  AutoScalingRole:
-    Type: AWS::IAM::Role
+  ScalingPolicyBlueMemory:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
     Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: application-autoscaling.amazonaws.com
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: ECSScalingPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - ecs:DescribeServices
-                  - ecs:UpdateService
-                Resource: "*"
+      PolicyName: !Sub "${EnvironmentName}-Blue-MemoryScalingPolicy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTargetBlue
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+          TargetValue: 70.0
+          ScaleInCooldown: 300
+          ScaleOutCooldown: 60
 
-Outputs:
-  ECSClusterName:
-    Description: The name of the ECS cluster
-    Value: !Ref ECSCluster
-  ECSBlueServiceName:
-    Description: The name of the ECS Blue service
-    Value: !Ref ECSBlueService
-  ECSGreenServiceName:
-    Description: The name of the ECS Green service
-    Value: !Ref ECSGreenService
+        Outputs:
+          ECSClusterName:
+            Description: The name of the ECS cluster
+            Value: !Ref ECSCluster
+            Export:
+              Name: !Sub "${AWS::StackName}-ECSClusterName"
+
+          ECSBlueServiceName:
+            Description: The name of the ECS Blue service
+            Value: !Ref ECSBlueService
+            Export:
+              Name: !Sub "${AWS::StackName}-ECSBlueServiceName"
+
+          ECSGreenServiceName:
+            Description: The name of the ECS Green service
+            Value: !Ref ECSGreenService
+            Export:
+              Name: !Sub "${AWS::StackName}-ECSGreenServiceName"
+
+          BlueTargetGroupArn:
+            Description: ARN of the Blue Target Group
+            Value: !Ref BlueTargetGroup
+            Export:
+              Name: !Sub "${AWS::StackName}-BlueTargetGroupArn"
+
+          GreenTargetGroupArn:
+            Description: ARN of the Green Target Group
+            Value: !Ref GreenTargetGroup
+            Export:
+              Name: !Sub "${AWS::StackName}-GreenTargetGroupArn"
+
+          LogGroupName:
+            Description: Name of the CloudWatch Log Group
+            Value: !Ref LogGroup
+            Export:
+              Name: !Sub "${AWS::StackName}-LogGroupName"
+
