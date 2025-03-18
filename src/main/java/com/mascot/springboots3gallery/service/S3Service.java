@@ -2,6 +2,7 @@ package com.mascot.springboots3gallery.service;
 
 
 import com.mascot.springboots3gallery.dto.ImageDto;
+import com.mascot.springboots3gallery.exception.InternalServerErrorException;
 import com.mascot.springboots3gallery.exception.ResourceNotFoundException;
 import com.mascot.springboots3gallery.utility.ContentTypeUtil;
 import org.slf4j.Logger;
@@ -28,7 +29,9 @@ import java.util.Map;
 public class S3Service {
 
     private static final String BUCKET_NAME = "image-gallery-mascot";
+
     private static final Logger logger = LoggerFactory.getLogger(S3Service.class);
+
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final ContentTypeUtil contentTypeUtil;
@@ -42,7 +45,8 @@ public class S3Service {
 
     // Upload a file to S3
     public void uploadFile(String key, File file) {
-        PutObjectRequest request = PutObjectRequest.builder()
+        PutObjectRequest request = PutObjectRequest
+                .builder()
                 .bucket(BUCKET_NAME)
                 .key(key)
                 .build();
@@ -52,7 +56,8 @@ public class S3Service {
     // Check if a file exists in S3
     public boolean fileExists(String key) {
         try {
-            HeadObjectRequest request = HeadObjectRequest.builder()
+            HeadObjectRequest request = HeadObjectRequest
+                    .builder()
                     .bucket(BUCKET_NAME)
                     .key(key)
                     .build();
@@ -71,21 +76,15 @@ public class S3Service {
         logger.info("Updated image name for key {}: {}", key, newName);
     }
 
-    public String getImageName(String key) {
-        return imageNameMap.getOrDefault(key, extractNameFromKey(key));
-    }
-
 
     // Generate a pre-signed URL for accessing an image
     public String generatePresidedUrl(String key) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(BUCKET_NAME)
-                .key(key)
-                .build();
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(BUCKET_NAME).key(key).build();
 
-        PresignedGetObjectRequest resignedRequest = s3Presigner.presignGetObject(r -> r
-                .getObjectRequest(getObjectRequest)
-                .signatureDuration(Duration.ofMinutes(120)));
+        PresignedGetObjectRequest resignedRequest = s3Presigner
+                .presignGetObject(r -> r
+                        .getObjectRequest(getObjectRequest)
+                        .signatureDuration(Duration.ofMinutes(120)));
 
         return resignedRequest.url().toString();
     }
@@ -98,11 +97,12 @@ public class S3Service {
         String continuationToken = null;
 
         do {
-            ListObjectsV2Response response = s3Client.listObjectsV2(ListObjectsV2Request.builder()
-                    .bucket(BUCKET_NAME)
-                    .maxKeys(1000) // Fetch up to 1000 objects per request (S3 limit)
-                    .continuationToken(continuationToken)
-                    .build());
+            ListObjectsV2Response response = s3Client.
+                    listObjectsV2(ListObjectsV2Request
+                            .builder()
+                            .bucket(BUCKET_NAME)
+                            .maxKeys(1000) // Fetch up to 1000 objects per request (S3 limit)
+                    .continuationToken(continuationToken).build());
 
             allObjects.addAll(response.contents());
             continuationToken = response.nextContinuationToken();
@@ -117,44 +117,40 @@ public class S3Service {
         List<S3Object> paginatedObjects = allObjects.subList(startIndex, endIndex);
 
         // Step 3: Map S3 objects to ImageDto objects
-        List<ImageDto> imageDtos = paginatedObjects.stream()
-                .map(s3Object -> {
-                    String key = s3Object.key();
-                    String presignedUrl = generatePresidedUrl(key);
-                    String contentType = null;
-                    LocalDateTime uploadedAt = null;
+        List<ImageDto> imageDtos = paginatedObjects.stream().map(s3Object -> {
+            String key = s3Object.key();
+            String presignedUrl = generatePresidedUrl(key);
+            String contentType = null;
+            LocalDateTime uploadedAt = null;
 
-                    try {
-                        HeadObjectResponse metadata = s3Client.headObject(HeadObjectRequest.builder()
+            try {
+                HeadObjectResponse metadata = s3Client
+                        .headObject(HeadObjectRequest
+                                .builder()
                                 .bucket(BUCKET_NAME)
                                 .key(key)
                                 .build());
-                        contentType = metadata.contentType();
-                        uploadedAt = metadata.lastModified().atZone(java.time.ZoneOffset.UTC).toLocalDateTime();
-                    } catch (Exception e) {
-                        logger.error("Failed to retrieve metadata for object with key: {}", key);
-                    }
+                contentType = metadata.contentType();
+                uploadedAt = metadata.lastModified().atZone(java.time.ZoneOffset.UTC).toLocalDateTime();
+            } catch (Exception e) {
+                logger.error("Failed to retrieve metadata for object with key: {}", key);
+            }
 
-                    if (contentType == null || contentType.equals("application/octet-stream")) {
-                        contentType = contentTypeUtil.getContentTypeFromKey(key);
-                    }
+            if (contentType == null || contentType.equals("application/octet-stream")) {
+                contentType = contentTypeUtil.getContentTypeFromKey(key);
+            }
 
-                    return new ImageDto(
-                            key,
-                            presignedUrl,
-                            contentType,
-                            s3Object.size(),
-                            extractNameFromKey(key),
-                            uploadedAt != null ? uploadedAt : LocalDateTime.now());
-                })
-                .toList();
+            return new ImageDto(key,
+                    presignedUrl,
+                    contentType,
+                    s3Object.size(), extractNameFromKey(key), uploadedAt != null ? uploadedAt : LocalDateTime.now());
+        }).toList();
 
         // Step 4: Calculate totalPages
         int totalPages = (int) Math.ceil((double) totalElements / pageable.getPageSize());
 
         // Log for debugging purposes
-        logger.info("Listing images with page {} and size {}. Total elements: {}, Total pages: {}",
-                pageable.getPageNumber(), pageable.getPageSize(), totalElements, totalPages);
+        logger.info("Listing images with page {} and size {}. Total elements: {}, Total pages: {}", pageable.getPageNumber(), pageable.getPageSize(), totalElements, totalPages);
 
         // Step 5: Return paginated results
         return new PageImpl<>(imageDtos, pageable, totalElements);
@@ -178,14 +174,11 @@ public class S3Service {
 
     public void deleteImage(String key) {
         try {
-            DeleteObjectRequest request = DeleteObjectRequest.builder()
-                    .bucket(BUCKET_NAME)
-                    .key(key)
-                    .build();
+            DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(BUCKET_NAME).key(key).build();
             s3Client.deleteObject(request);
             logger.info("Deleted image with key: {}", key);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to delete image with key: " + key, e);
+            throw new InternalServerErrorException("Failed to delete image with key: " );
         }
     }
 }

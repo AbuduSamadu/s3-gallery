@@ -145,7 +145,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 const timestamp = document.createElement('p');
                 timestamp.classList.add('card-text');
-                timestamp.textContent = `Uploaded at: ${new Date(image.uploadedAt).toLocaleString()}`;
+                timestamp.textContent = `${new Date(image.uploadedAt).toLocaleString()}`;
 
                 const actions = document.createElement('div');
                 actions.classList.add('card-actions');
