@@ -42,10 +42,11 @@ jobs:
             --parameter-overrides \
               EnvironmentName=dev \
               ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
-              TargetGroupArn=${{ secrets.TARGET_GROUP_ARN }} \
+              ALBListenerArn=${{ secrets.TARGET_GROUP_ARN }} \
               VPC=${{ secrets.VPC_ID }} \
               Subnets=${{ secrets.SUBNET_IDS }}\
-              SecurityGroup=${{ secrets.SECURITY_GROUP_ID }}\
+              ECSSecurityGroup=${{ secrets.SECURITY_GROUP_ID }}\
+              s3BucketName=${{ secrets.S3_BUCKET_NAME }}\
               containerPort=8080
 
       # Deploy Pipeline stack
