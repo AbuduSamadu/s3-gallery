@@ -205,15 +205,15 @@ Resources:
           Environment:
             - Name: ENVIRONMENT
               Value: !Ref EnvironmentName
-          # Modified health check with increased startup period and more retries
+          # Modified health check with increased startup period and dynamic port
           HealthCheck:
             Command:
               - CMD-SHELL
-              - curl -f http://localhost:8080/health || exit 1
+              - !Sub "curl -f http://localhost:${ContainerPort}/health || exit 1"
             Interval: 30
             Timeout: 10
             Retries: 5
-            StartPeriod: 120
+            StartPeriod: 180
       Tags:
         - Key: Environment
           Value: !Ref EnvironmentName
@@ -338,10 +338,10 @@ Resources:
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 50
-        # Disable circuit breaker initially to avoid triggering the error
+        # Enable circuit breaker with rollback for more stability
         DeploymentCircuitBreaker:
-          Enable: false
-          Rollback: false
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -353,8 +353,8 @@ Resources:
         - ContainerName: !Sub "${EnvironmentName}-Container"
           ContainerPort: !Ref ContainerPort
           TargetGroupArn: !Ref BlueTargetGroup
-      # Enable healthcheck grace period to allow time for startup
-      HealthCheckGracePeriodSeconds: 300
+      # Increased healthcheck grace period to allow more time for startup
+      HealthCheckGracePeriodSeconds: 600
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       Tags:
@@ -377,10 +377,10 @@ Resources:
       DeploymentConfiguration:
         MaximumPercent: 200
         MinimumHealthyPercent: 50
-        # Disable circuit breaker initially to avoid triggering the error
+        # Enable circuit breaker with rollback for more stability
         DeploymentCircuitBreaker:
-          Enable: false
-          Rollback: false
+          Enable: true
+          Rollback: true
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -392,8 +392,8 @@ Resources:
         - ContainerName: !Sub "${EnvironmentName}-Container"
           ContainerPort: !Ref ContainerPort
           TargetGroupArn: !Ref GreenTargetGroup
-      # Enable healthcheck grace period to allow time for startup
-      HealthCheckGracePeriodSeconds: 300
+      # Increased healthcheck grace period to allow more time for startup
+      HealthCheckGracePeriodSeconds: 600
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       Tags:
@@ -437,44 +437,80 @@ Resources:
       TargetTrackingScalingPolicyConfiguration:
         PredefinedMetricSpecification:
           PredefinedMetricType: ECSServiceAverageMemoryUtilization
-          TargetValue: 70.0
-          ScaleInCooldown: 300
-          ScaleOutCooldown: 60
+        TargetValue: 70.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
 
-        Outputs:
-          ECSClusterName:
-            Description: The name of the ECS cluster
-            Value: !Ref ECSCluster
-            Export:
-              Name: !Sub "${AWS::StackName}-ECSClusterName"
+  # Adding auto-scaling for Green service for consistency
+  ScalableTargetGreen:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    Properties:
+      MaxCapacity: 10
+      MinCapacity: 0
+      ResourceId: !Sub "service/${ECSCluster}/${ECSGreenService.Name}"
+      RoleARN: !GetAtt AutoScalingRole.Arn
+      ScalableDimension: ecs:service:DesiredCount
+      ServiceNamespace: ecs
 
-          ECSBlueServiceName:
-            Description: The name of the ECS Blue service
-            Value: !Ref ECSBlueService
-            Export:
-              Name: !Sub "${AWS::StackName}-ECSBlueServiceName"
+  ScalingPolicyGreen:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-Green-CPUScalingPolicy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTargetGreen
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        TargetValue: 70.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
 
-          ECSGreenServiceName:
-            Description: The name of the ECS Green service
-            Value: !Ref ECSGreenService
-            Export:
-              Name: !Sub "${AWS::StackName}-ECSGreenServiceName"
+  ScalingPolicyGreenMemory:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-Green-MemoryScalingPolicy"
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref ScalableTargetGreen
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        TargetValue: 70.0
+        ScaleInCooldown: 300
+        ScaleOutCooldown: 60
 
-          BlueTargetGroupArn:
-            Description: ARN of the Blue Target Group
-            Value: !Ref BlueTargetGroup
-            Export:
-              Name: !Sub "${AWS::StackName}-BlueTargetGroupArn"
+Outputs:
+  ECSClusterName:
+    Description: The name of the ECS cluster
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSClusterName"
 
-          GreenTargetGroupArn:
-            Description: ARN of the Green Target Group
-            Value: !Ref GreenTargetGroup
-            Export:
-              Name: !Sub "${AWS::StackName}-GreenTargetGroupArn"
+  ECSBlueServiceName:
+    Description: The name of the ECS Blue service
+    Value: !Ref ECSBlueService
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSBlueServiceName"
 
-          LogGroupName:
-            Description: Name of the CloudWatch Log Group
-            Value: !Ref LogGroup
-            Export:
-              Name: !Sub "${AWS::StackName}-LogGroupName"
+  ECSGreenServiceName:
+    Description: The name of the ECS Green service
+    Value: !Ref ECSGreenService
+    Export:
+      Name: !Sub "${AWS::StackName}-ECSGreenServiceName"
 
+  BlueTargetGroupArn:
+    Description: ARN of the Blue Target Group
+    Value: !Ref BlueTargetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-BlueTargetGroupArn"
+
+  GreenTargetGroupArn:
+    Description: ARN of the Green Target Group
+    Value: !Ref GreenTargetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-GreenTargetGroupArn"
+
+  LogGroupName:
+    Description: Name of the CloudWatch Log Group
+    Value: !Ref LogGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-LogGroupName"
