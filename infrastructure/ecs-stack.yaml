@@ -340,8 +340,8 @@ Resources:
         MinimumHealthyPercent: 50
         # Enable circuit breaker with rollback for more stability
         DeploymentCircuitBreaker:
-          Enable: true
-          Rollback: true
+          Enable: false
+          Rollback: false
       NetworkConfiguration:
         AwsvpcConfiguration:
           AssignPublicIp: DISABLED
@@ -354,7 +354,7 @@ Resources:
           ContainerPort: !Ref ContainerPort
           TargetGroupArn: !Ref BlueTargetGroup
       # Increased healthcheck grace period to allow more time for startup
-      HealthCheckGracePeriodSeconds: 600
+      HealthCheckGracePeriodSeconds: 900
       EnableECSManagedTags: true
       PropagateTags: SERVICE
       Tags:
