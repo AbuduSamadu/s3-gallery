@@ -44,7 +44,9 @@ jobs:
               ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
               TargetGroupArn=${{ secrets.TARGET_GROUP_ARN }} \
               VPC=${{ secrets.VPC_ID }} \
-              Subnets=${{ secrets.SUBNET_IDS }}
+              Subnets=${{ secrets.SUBNET_IDS }}\
+              SecurityGroup=${{ secrets.SECURITY_GROUP_ID }}\
+              containerPort=8080
 
       # Deploy Pipeline stack
       - name: Deploy Pipeline Stack
