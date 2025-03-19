@@ -44,7 +44,7 @@ Parameters:
 
   S3BucketName:
     Type: String
-    Default: image-gallery-mascot-new-1
+    Default: image-gallery-mascot-new
     Description: Name of the S3 bucket for storing images
 
 Resources:
