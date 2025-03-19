@@ -41,12 +41,6 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --parameter-overrides \
               EnvironmentName=dev \
-              ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
-              ALBListenerArn=${{ secrets.TARGET_GROUP_ARN }} \
-              VPC=${{ secrets.VPC_ID }} \
-              Subnets=${{ secrets.SUBNET_IDS }}\
-              ECSSecurityGroup=${{ secrets.SECURITY_GROUP_ID }}\
-              s3BucketName=${{ secrets.S3_BUCKET_NAME }}\
               containerPort=8080
 
       # Deploy Pipeline stack

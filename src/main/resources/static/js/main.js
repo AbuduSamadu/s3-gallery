@@ -103,7 +103,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Function to fetch and render images
     const fetchAndRenderImages = async (page = 0) => {
         try {
-            const response = await fetch(`/gallery/api/images?page=${page}&size=4`);
+            const response = await fetch(`/api/images/gallery?page=${page}&size=4`);
             const data = await response.json();
 
             if (!data.content || !Array.isArray(data.content)) {

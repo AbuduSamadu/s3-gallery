@@ -49,6 +49,7 @@ public class S3Service {
                 .builder()
                 .bucket(BUCKET_NAME)
                 .key(key)
+                .contentLength(file.length())
                 .build();
         s3Client.putObject(request, RequestBody.fromFile(file));
     }
@@ -102,7 +103,7 @@ public class S3Service {
                             .builder()
                             .bucket(BUCKET_NAME)
                             .maxKeys(1000) // Fetch up to 1000 objects per request (S3 limit)
-                    .continuationToken(continuationToken).build());
+                            .continuationToken(continuationToken).build());
 
             allObjects.addAll(response.contents());
             continuationToken = response.nextContinuationToken();
@@ -178,7 +179,7 @@ public class S3Service {
             s3Client.deleteObject(request);
             logger.info("Deleted image with key: {}", key);
         } catch (Exception e) {
-            throw new InternalServerErrorException("Failed to delete image with key: " );
+            throw new InternalServerErrorException("Failed to delete image with key: ");
         }
     }
 }

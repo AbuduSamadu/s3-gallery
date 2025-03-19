@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
-@RequestMapping("/gallery")
+@RequestMapping("/api/images")
 public class GalleryController {
 
     private final ImageService imageService;
@@ -21,7 +21,7 @@ public class GalleryController {
     }
 
     // Endpoint for API (JSON response)
-    @GetMapping("/api/images")
+    @GetMapping("/gallery")
     public ResponseEntity<Page<ImageDto>> listImagesApi(Pageable pageable) {
         Page<ImageDto> images = imageService.listImages(pageable);
         return ResponseEntity.ok(images);
