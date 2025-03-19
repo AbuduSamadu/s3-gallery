@@ -16,8 +16,8 @@ import java.util.Objects;
 
 @Service
 public class ImageService {
-    Logger logger = LoggerFactory.getLogger(ImageService.class);
     private final S3Service s3Service;
+    Logger logger = LoggerFactory.getLogger(ImageService.class);
 
     public ImageService(S3Service s3Service) {
         this.s3Service = s3Service;
@@ -30,10 +30,10 @@ public class ImageService {
             logger.error("Only image files are allowed.");
             throw new BadRequestException("Only image files are allowed.");
         }
-        String key = imageName + "-" + file.getOriginalFilename();
+
         File tempFile = convertMultipartFileToFile(file);
-        s3Service.uploadFile(key, tempFile);
-        s3Service.generatePresidedUrl(key);
+        s3Service.uploadFile(imageName, tempFile);
+        s3Service.generatePresidedUrl(imageName);
     }
 
     // List images with pagination
