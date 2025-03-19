@@ -96,13 +96,40 @@ document.addEventListener("DOMContentLoaded", async () => {
                 const card = document.createElement('div');
                 card.classList.add('card');
 
+                // Image container with hover actions
+                const imageContainer = document.createElement('div');
+                imageContainer.classList.add('card-image-container');
+
                 const img = document.createElement('img');
                 img.src = image.url;
                 img.alt = image.name;
                 img.classList.add('card-image');
 
-                const cardBody = document.createElement('div');
-                cardBody.classList.add('card-body');
+                // Hover actions
+                const hoverActions = document.createElement('div');
+                hoverActions.classList.add('card-actions-hover');
+
+                const editButton = document.createElement('button');
+                editButton.classList.add('btn', 'btn-sm', 'btn-primary', 'edit-button');
+                editButton.innerHTML = '<i class="fa-solid fa-pen-to-square"></i>';
+                editButton.dataset.key = image.key;
+                editButton.setAttribute('aria-label', 'Edit Image');
+
+                const deleteButton = document.createElement('button');
+                deleteButton.classList.add('btn', 'btn-sm', 'btn-danger', 'delete-button');
+                deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i>';
+                deleteButton.dataset.key = image.key;
+                deleteButton.setAttribute('aria-label', 'Delete Image');
+
+                hoverActions.appendChild(editButton);
+                hoverActions.appendChild(deleteButton);
+
+                imageContainer.appendChild(img);
+                imageContainer.appendChild(hoverActions);
+
+                // Card details
+                const cardDetails = document.createElement('div');
+                cardDetails.classList.add('card-details');
 
                 const title = document.createElement('h5');
                 title.classList.add('card-title');
@@ -112,23 +139,17 @@ document.addEventListener("DOMContentLoaded", async () => {
                 timestamp.classList.add('card-text');
                 timestamp.textContent = `${new Date(image.uploadedAt).toLocaleString()}`;
 
-                const actions = document.createElement('div');
-                actions.classList.add('card-actions');
+                cardDetails.appendChild(title);
+                cardDetails.appendChild(timestamp);
 
-                const editButton = document.createElement('button');
-                editButton.classList.add('btn', 'btn-sm', 'btn-primary', 'edit-button');
-                editButton.innerHTML = '<i class="fa-solid fa-pen-to-square"></i> Edit';
-                editButton.dataset.key = image.key;
+                // Append all parts to the card
+                card.appendChild(imageContainer);
+                card.appendChild(cardDetails);
 
-                const deleteButton = document.createElement('button');
-                deleteButton.classList.add('btn', 'btn-sm', 'btn-danger', 'delete-button');
-                deleteButton.innerHTML = '<i class="fa-solid fa-trash"></i> Delete';
-                deleteButton.dataset.key = image.key;
-
-                // Handle edit button click
-                editButton.addEventListener("click", async () => {
-                    const newName = prompt("Enter the new name for the image:", title.textContent);
-                    if (newName && newName.trim() !== "") {
+                // Event listeners for edit and delete
+                editButton.addEventListener('click', async () => {
+                    const newName = prompt('Enter the new name for the image:', title.textContent);
+                    if (newName && newName.trim() !== '') {
                         try {
                             const response = await fetch(`/api/images/${editButton.dataset.key}`, {
                                 method: 'PUT',
@@ -148,9 +169,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                     }
                 });
 
-                // Handle delete button click
-                deleteButton.addEventListener("click", async () => {
-                    if (confirm("Are you sure you want to delete this image?")) {
+                deleteButton.addEventListener('click', async () => {
+                    if (confirm('Are you sure you want to delete this image?')) {
                         try {
                             const response = await fetch(`/api/images/${deleteButton.dataset.key}`, {
                                 method: 'DELETE',
@@ -168,16 +188,6 @@ document.addEventListener("DOMContentLoaded", async () => {
                     }
                 });
 
-                actions.appendChild(editButton);
-                actions.appendChild(deleteButton);
-
-                cardBody.appendChild(title);
-                cardBody.appendChild(timestamp);
-                cardBody.appendChild(actions);
-
-                card.appendChild(img);
-                card.appendChild(cardBody);
-
                 gallery.appendChild(card);
             });
         } catch (error) {
@@ -190,14 +200,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     fetchAndRenderImages(currentPage);
 
     // Handle Previous Page
-    prevButton.addEventListener("click", () => {
+    prevButton.addEventListener('click', () => {
         if (currentPage > 0) {
             fetchAndRenderImages(currentPage - 1);
         }
     });
 
     // Handle Next Page
-    nextButton.addEventListener("click", () => {
+    nextButton.addEventListener('click', () => {
         if (currentPage < totalPages - 1) {
             fetchAndRenderImages(currentPage + 1);
         }
