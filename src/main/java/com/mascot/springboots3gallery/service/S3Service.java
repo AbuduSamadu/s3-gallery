@@ -109,6 +109,8 @@ public class S3Service {
             continuationToken = response.nextContinuationToken();
         } while (continuationToken != null);
 
+        allObjects.removeIf(s3Object -> s3Object.key().endsWith(".zip"));
+
         int totalElements = allObjects.size(); // Total number of objects in the bucket
 
         // Step 2: Paginate the objects based on the requested page and pageSize
