@@ -14,7 +14,7 @@ Parameters:
 
   ECRRepositoryURI:
     Type: String
-    Default: public.ecr.aws/g4y8k5p1/abudusamadu:abudusamadu_taskmanager
+    Default: public.ecr.aws/g4y8k5p1/s3-gallery:latest
     Description: Name of the ECR repository
 
   TaskCPU:
