@@ -1,11 +1,15 @@
-document.addEventListener("DOMContentLoaded", () => {
-    // const prevButton = document.getElementById("prev-page");
-    // const nextButton = document.getElementById("next-page");
+document.addEventListener("DOMContentLoaded", async () => {
     const modal = new bootstrap.Modal(document.getElementById('upload-modal'));
     const imagePreviewContainer = document.getElementById('image-preview-container');
     const imagePreview = document.getElementById('image-preview');
-
     const gallery = document.getElementById('gallery');
+    const prevButton = document.getElementById('prev-page');
+    const nextButton = document.getElementById('next-page');
+    const currentPageElement = document.getElementById('current-page');
+    const totalPagesElement = document.getElementById('total-pages');
+
+    let currentPage = 0; // Start with page 0
+    let totalPages = 1;  // Default to 1 page
 
     // Open modal on button click
     document.getElementById('open-modal').addEventListener('click', () => {
@@ -13,25 +17,23 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // Handle file selection for preview
-    document.getElementById('image-file').addEventListener('changclear' +
-        '' +
-        'e', (event) => {
+    document.getElementById('image-file').addEventListener('change', (event) => {
         const file = event.target.files[0];
-        if (file) {
+        if (file && file.type.startsWith('image/')) { // Validate file type
             const reader = new FileReader();
 
             reader.onload = (e) => {
-                imagePreview.src = e.target.result; // Set the image source to the preview
-                imagePreviewContainer.classList.remove('d-none'); // Show the preview container
+                imagePreview.src = e.target.result;
+                imagePreviewContainer.classList.remove('d-none');
             };
 
-            reader.readAsDataURL(file); // Read the file as a data URL
+            reader.readAsDataURL(file);
         } else {
-            imagePreview.src = '#'; // Reset the preview if no file is selected
-            imagePreviewContainer.classList.add('d-none'); // Hide the preview container
+            imagePreview.src = '#';
+            imagePreviewContainer.classList.add('d-none');
+            alert('Please select a valid image file.');
         }
     });
-
 
     // Handle form submission
     document.getElementById('upload-form').addEventListener('submit', async (event) => {
@@ -64,56 +66,19 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Handle Previous Page
-    prevButton?.addEventListener("click", () => {
-        const currentPage = parseInt(new URLSearchParams(window.location.search).get("page") || 0);
-        window.location.search = `page=${currentPage - 1}`;
-    });
-
-    // Handle Next Page
-    nextButton?.addEventListener("click", () => {
-        const currentPage = parseInt(new URLSearchParams(window.location.search).get("page") || 0);
-        window.location.search = `page=${currentPage + 1}`;
-    });
-
-    // Handle Edit and Delete Buttons
-    document.querySelectorAll(".edit-button").forEach((button) => {
-        button.addEventListener("click", () => {
-            alert("Edit functionality not implemented yet.");
-        });
-    });
-
-    document.querySelectorAll(".delete-button").forEach((button) => {
-        button.addEventListener("click", () => {
-            alert("Delete functionality not implemented yet.");
-        });
-    });
-});
-
-document.addEventListener("DOMContentLoaded", async () => {
-    const gallery = document.getElementById('gallery');
-    const prevButton = document.getElementById('prev-page');
-    const nextButton = document.getElementById('next-page');
-    const currentPageElement = document.getElementById('current-page');
-    const totalPagesElement = document.getElementById('total-pages');
-
-    let currentPage = 0; // Start with page 0
-    let totalPages = 1; // Default to 1 page
-
-    // Function to fetch and render images
+    // Fetch and render images
     const fetchAndRenderImages = async (page = 0) => {
         try {
             const response = await fetch(`/api/images/gallery?page=${page}&size=4`);
             const data = await response.json();
 
             if (!data.content || !Array.isArray(data.content)) {
-                console.error('Invalid API response:', data);
-                return;
+                throw new Error('Invalid API response');
             }
 
             // Update pagination metadata
-            currentPage = data.number;
-            totalPages = data.totalPages;
+            currentPage = data.number || 0;
+            totalPages = data.totalPages || 1;
 
             // Update UI elements
             currentPageElement.textContent = currentPage + 1; // Convert zero-based index to one-based
@@ -167,41 +132,38 @@ document.addEventListener("DOMContentLoaded", async () => {
                         try {
                             const response = await fetch(`/api/images/${editButton.dataset.key}`, {
                                 method: 'PUT',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify({ name: newName })
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: newName }),
                             });
 
                             if (response.ok) {
-                                // Update the image name in the DOM
                                 title.textContent = newName;
                             } else {
-                                console.error('Failed to update image name:', response.statusText);
+                                alert('Failed to update image name.');
                             }
                         } catch (error) {
                             console.error('Error updating image name:', error);
+                            alert('An error occurred while updating the image name.');
                         }
                     }
                 });
-
 
                 // Handle delete button click
                 deleteButton.addEventListener("click", async () => {
                     if (confirm("Are you sure you want to delete this image?")) {
                         try {
                             const response = await fetch(`/api/images/${deleteButton.dataset.key}`, {
-                                method: 'DELETE'
+                                method: 'DELETE',
                             });
 
                             if (response.ok) {
-                                // Remove the card from the DOM
-                                gallery.removeChild(card);
+                                gallery.removeChild(card); // Remove the card from the DOM
                             } else {
-                                console.error('Failed to delete image:', response.statusText);
+                                alert('Failed to delete image.');
                             }
                         } catch (error) {
                             console.error('Error deleting image:', error);
+                            alert('An error occurred while deleting the image.');
                         }
                     }
                 });
@@ -220,6 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         } catch (error) {
             console.error('Error fetching images:', error);
+            alert('An error occurred while fetching images.');
         }
     };
 
