@@ -1,0 +1,10 @@
+version: 0.0
+Resources:
+  - TargetService:
+      Type: AWS::ECS::Service
+      Properties:
+        TaskDefinition: "arn:aws:ecs:us-east-1:639032722473:task-definition/s3-app-task1:2"
+        LoadBalancerInfo:
+          ContainerName: "s3app-container"
+          ContainerPort: 9090
+        PlatformVersion: "LATEST"

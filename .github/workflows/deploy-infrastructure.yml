@@ -42,17 +42,3 @@ jobs:
             --parameter-overrides \
               EnvironmentName=dev \
               containerPort=8080
-
-      # Deploy Pipeline stack
-      - name: Deploy Pipeline Stack
-        run: |
-          aws cloudformation deploy \
-            --template-file infrastructure/pipeline-stack.yaml \
-            --stack-name my-pipeline-stack \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides \
-              GitHubRepo=${{ github.repository }} \
-              GitHubBranch=main \
-              ECRRepositoryURI=${{ secrets.ECR_REPOSITORY_URI }} \
-              ECSserviceName=my-ecs-service \
-              ECSclusterName=my-ecs-cluster
