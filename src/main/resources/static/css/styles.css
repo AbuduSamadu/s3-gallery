@@ -57,86 +57,12 @@ body {
     background-color: #cc0000;
 }
 
-/* Gallery Section */
-.gallery {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 20px;
-    padding: 20px;
-}
-
-.card {
-    background-color: #fff;
-    border: 1px solid #ddd;
-    border-radius: 10px;
-    overflow: hidden;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-5px);
-}
-
-.card-image {
-    width: 100%;
-    height: auto;
-    object-fit: cover;
-    aspect-ratio: 16/9;
-    border-bottom: 1px solid #ddd;
-}
-
-.card-info {
-    padding: 10px;
-}
-
-.card-info .date-time {
-    font-size: 0.9rem;
-    color: #555;
-    margin-bottom: 10px;
-}
-
-.card-info .actions {
-    display: flex;
-    justify-content: space-between;
-}
-
-.card-info .actions button {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    font-size: 0.9rem;
-    transition: background-color 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 5px; /* Space between icon and text */
-}
-
-.card-info .edit-button {
-    background-color: #3498db;
-    color: white;
-}
-
-.card-info .edit-button:hover {
-    background-color: #2980b9;
-}
-
-.card-info .delete-button {
-    background-color: #e74c3c;
-    color: white;
-}
-
-.card-info .delete-button:hover {
-    background-color: #c0392b;
-}
-
 /* Pagination */
 .pagination {
     display: flex;
     justify-content: center;
     gap: 10px;
-    margin-top: 40px;
+    margin-top: 10px;
 }
 
 .pagination button {
@@ -163,63 +89,122 @@ body {
 }
 
 #image-preview{
-    max-height: 200px;
+    max-height: 100px;
     object-fit: cover;
 }
 
 
-/* Custom CSS for Image Gallery */
+/* Gallery Section */
 .gallery {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 16px;
-    margin: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Larger minimum width */
+    gap: 20px;
+    padding: 20px;
 }
 
 .card {
+    position: relative; /* Required for absolute positioning of overlay */
+    background-color: #fff;
     border: 1px solid #ddd;
-    border-radius: 8px;
+    border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease-in-out;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Slightly more prominent shadow */
+    transition: transform 0.3s ease;
+    height: 400px; /* Fixed height for larger cards */
 }
 
-.card:hover {
-    transform: translateY(-5px);
+/* Image Container */
+.card-image-container {
+    position: relative;
+    overflow: hidden;
+    height: 100%; /* Full height of the card */
 }
 
 .card-image {
     width: 100%;
-    height: auto;
-    object-fit: cover;
-    aspect-ratio: 16 / 9; /* Maintain a consistent aspect ratio */
+    height: 100%;
+    object-fit: cover; /* Cover the entire card */
+    transition: transform 0.3s ease;
 }
 
-.card-body {
-    padding: 16px;
-    text-align: left;
+.card:hover .card-image {
+    transform: scale(1.1); /* Enlarge image on hover */
 }
 
-.card-title {
-    font-size: 1.2rem;
+/* Overlay */
+.card-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.6); /* Semi-transparent background */
+    color: white;
+    padding: 20px; /* Increased padding for larger cards */
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%; /* Full height of the card */
+    transform: translateY(100%); /* Initially hidden below the card */
+}
+
+.card:hover .card-overlay {
+    opacity: 1;
+    margin-top: 10px;
+    padding: 10px;
+    transform: translateY(0); /* Slide up to reveal overlay */
+}
+
+.card-overlay .card-text-container {
+    text-align: right; /* Right-align text */
+    margin-top: 10px;
+    padding: 10px;
+}
+
+.card-overlay .card-title {
+    font-size: 1.4rem; /* Larger font size */
     margin-bottom: 8px;
-    color: #333;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); /* Improve readability */
 }
 
-.card-text {
-    font-size: 0.9rem;
-    color: #666;
-    margin-bottom: 12px;
+.card-overlay .card-text {
+    font-size: 1rem; /* Larger font size */
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
 }
 
-.card-actions {
+/* Hover Actions */
+.card-actions-hover {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
-.card-actions .btn {
-    flex: 1;
-    padding: 8px 12px;
-    font-size: 0.9rem;
+.card:hover .card-actions-hover {
+    opacity: 1;
+}
+
+.card-actions-hover .edit-button,
+.card-actions-hover .delete-button {
+    padding: 10px; /* Larger buttons */
+    border-radius: 50%; /* Circular buttons */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem; /* Larger icons */
+}
+
+.card-actions-hover .edit-button {
+    background-color: #3498db;
+    color: white;
+}
+
+.card-actions-hover .delete-button {
+    background-color: #e74c3c;
+    color: white;
 }

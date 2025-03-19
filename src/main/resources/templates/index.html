@@ -60,20 +60,25 @@
 <!-- Image Gallery -->
 <main>
     <section class="gallery" id="gallery">
-        <!-- Initial images rendered by Thymeleaf -->
         <div class="card" th:each="image : ${content}">
-            <img th:src="${image.url}" alt="Image" class="card-image">
-            <div class="card-body">
-                <h5 class="card-title" th:text="${image.name}">ImageName</h5>
-                <p class="card-text">
-                    <span th:text="${#temporals.format(image.uploadedAt, 'yyyy-MM-dd h:mm a')}"></span>
-                </p>
-                <div class="card-actions">
+            <div class="card-image-container">
+                <img th:src="${image.url}" alt="Image" class="card-image">
+                <!-- Overlay -->
+                <div class="card-overlay">
+                    <div class="card-text-container">
+                        <h5 class="card-title" th:text="${image.name}">ImageName</h5>
+                        <p class="card-text">
+                            <span th:text="${#temporals.format(image.uploadedAt, 'yyyy-MM-dd h:mm a')}"></span>
+                        </p>
+                    </div>
+                </div>
+                <!-- Hover Actions -->
+                <div class="card-actions-hover">
                     <button class="btn btn-sm btn-primary edit-button" data-key="${image.key}">
-                        <i class="fa-solid fa-pen-to-square"></i> Edit
+                        <i class="fa-solid fa-pen-to-square"></i>
                     </button>
                     <button class="btn btn-sm btn-danger delete-button" data-key="${image.key}">
-                        <i class="fa-solid fa-trash"></i> Delete
+                        <i class="fa-solid fa-trash"></i>
                     </button>
                 </div>
             </div>
