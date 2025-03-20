@@ -70,7 +70,7 @@ public class S3Service {
     }
 
     public void updateImageName(String key, String newName) {
-        if (!imageNameMap.containsKey(key)) {
+        if (!fileExists(key)) {
             throw new ResourceNotFoundException("Image with key " + key + " not found.");
         }
         imageNameMap.put(key, newName);
@@ -80,29 +80,31 @@ public class S3Service {
 
     // Generate a pre-signed URL for accessing an image
     public String generatePresidedUrl(String key) {
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder().bucket(BUCKET_NAME).key(key).build();
+        GetObjectRequest getObjectRequest = GetObjectRequest
+                .builder()
+                .bucket(BUCKET_NAME)
+                .key(key)
+                .build();
 
         PresignedGetObjectRequest resignedRequest = s3Presigner
                 .presignGetObject(r -> r
                         .getObjectRequest(getObjectRequest)
                         .signatureDuration(Duration.ofMinutes(120)));
-
         return resignedRequest.url().toString();
     }
 
 
     // List images from S3 with pagination
     public Page<ImageDto> listImages(Pageable pageable) {
-        // Step 1: Fetch all objects in the bucket to calculate totalElements
+        // Fetch all objects in the bucket to calculate totalElements
         List<S3Object> allObjects = new ArrayList<>();
         String continuationToken = null;
-
         do {
             ListObjectsV2Response response = s3Client.
                     listObjectsV2(ListObjectsV2Request
                             .builder()
                             .bucket(BUCKET_NAME)
-                            .maxKeys(1000) // Fetch up to 1000 objects per request (S3 limit)
+                            .maxKeys(1000)
                             .continuationToken(continuationToken).build());
 
             allObjects.addAll(response.contents());
@@ -111,15 +113,15 @@ public class S3Service {
 
         allObjects.removeIf(s3Object -> s3Object.key().endsWith(".zip"));
 
-        int totalElements = allObjects.size(); // Total number of objects in the bucket
+        int totalElements = allObjects.size();
 
-        // Step 2: Paginate the objects based on the requested page and pageSize
-        int startIndex = (int) pageable.getOffset(); // Start index for the current page
-        int endIndex = Math.min(startIndex + pageable.getPageSize(), totalElements); // End index for the current page
+        //  Paginate the objects based on the requested page and pageSize
+        int startIndex = (int) pageable.getOffset();
+        int endIndex = Math.min(startIndex + pageable.getPageSize(), totalElements);
 
         List<S3Object> paginatedObjects = allObjects.subList(startIndex, endIndex);
 
-        // Step 3: Map S3 objects to ImageDto objects
+        // Map S3 objects to ImageDto objects
         List<ImageDto> imageDtos = paginatedObjects.stream().map(s3Object -> {
             String key = s3Object.key();
             String presignedUrl = generatePresidedUrl(key);
@@ -149,13 +151,17 @@ public class S3Service {
                     s3Object.size(), extractNameFromKey(key), uploadedAt != null ? uploadedAt : LocalDateTime.now());
         }).toList();
 
-        // Step 4: Calculate totalPages
+        //  Calculate totalPages
         int totalPages = (int) Math.ceil((double) totalElements / pageable.getPageSize());
 
         // Log for debugging purposes
-        logger.info("Listing images with page {} and size {}. Total elements: {}, Total pages: {}", pageable.getPageNumber(), pageable.getPageSize(), totalElements, totalPages);
+        logger.info("Listing images with page {} and size {}. Total elements: {}, Total pages: {}",
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                totalElements,
+                totalPages);
 
-        // Step 5: Return paginated results
+        // Return paginated results
         return new PageImpl<>(imageDtos, pageable, totalElements);
     }
 
@@ -177,7 +183,12 @@ public class S3Service {
 
     public void deleteImage(String key) {
         try {
-            DeleteObjectRequest request = DeleteObjectRequest.builder().bucket(BUCKET_NAME).key(key).build();
+            DeleteObjectRequest request = DeleteObjectRequest
+                    .builder()
+                    .bucket(BUCKET_NAME)
+                    .key(key)
+                    .build();
+
             s3Client.deleteObject(request);
             logger.info("Deleted image with key: {}", key);
         } catch (Exception e) {
