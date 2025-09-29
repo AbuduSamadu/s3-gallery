@@ -57,3 +57,4 @@ jobs:
             --deployment-group-name s3-app-group \
             --s3-location bucket=image-gallery-mascot,bundleType=zip,key=deployment.zip \
             --region us-east-1
+            
